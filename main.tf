@@ -35,6 +35,9 @@ variable instance_type {
 variable public_key_location {
   type        = string
 }
+variable private_key_location {
+  type        = string
+}
 
 
 resource "aws_vpc" "my-vpc" {
@@ -151,7 +154,55 @@ resource "aws_instance" "my-server" {
   associate_public_ip_address = true
   key_name = aws_key_pair.ssh-key.key_name
 
-  user_data = file("user_data.sh")
+  # user_data = file("user_data.sh")
+  connection {
+    type = "ssh"
+    host = self.public_ip
+    user = "ec2-user"
+    private_key = file(var.private_key_location)
+  }
+
+  #to copy a file to the remote machine 
+  provisioner "file" {
+    source = "user_data.sh"
+    destination = "/home/ec2-user/user_data.sh"
+  }
+
+  # provisioner "file" {
+  #   source = "user_data.sh"
+  #   destination = "/home/ec2-user/user_data.sh"
+
+  #   #having a separate connection
+  #   connection {
+  #     type = "ssh"
+  #     host = someotherserver.public_ip
+  #     user = "ec2-user"
+  #     private_key = file(var.private_key_location)
+  #   }
+  # }
+
+
+  provisioner "remote-exec" {
+    # inline = [
+    #   "sudo yum update -y && sudo yum install -y docker",
+    #   "sudo systemctl start docker",
+    #   "sudo usermod -aG docker ec2-user", 
+    #   "docker run -p 8080:80 nginx"
+    # ]
+
+    # or
+    # script = file("./user_data.sh")
+    
+    inline = [
+        "chmod +x /home/ec2-user/user_data.sh",
+        "~/user_data.sh",
+    ]
+  }
+
+  # it's better to use local provider not provisioner
+  # provisioner "local-exec" {
+  #   command = "echo ${self.public_ip} > ip.txt"
+  # }
 
   tags = {
     Name:  "${var.env_prefix}-server"
